@@ -17,12 +17,13 @@ export function HomePage() {
   const [isAuthOpen, setIsAuthOpen] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
 
-  const { getAvailableProducts } = useProductStore();
+  const { fetchProducts, getAvailableProducts } = useProductStore();
   const { user, isAuthenticated } = useAuthStore();
 
   useEffect(() => {
     setIsMounted(true);
-  }, []);
+    fetchProducts();
+  }, [fetchProducts]);
 
   const cartItemsCount = useCartStore((state) => state.getTotalItemsCount());
   const products = isMounted ? getAvailableProducts() : [];

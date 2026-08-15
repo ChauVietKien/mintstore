@@ -30,8 +30,8 @@ import { formatCurrency } from '@/lib/utils';
 
 export function AdminDashboardPage() {
   const { user, logout } = useAuthStore();
-  const { orders, updateOrderStatus } = useOrderStore();
-  const { products, addProduct, toggleAvailability, deleteProduct } = useProductStore();
+  const { orders, fetchOrders, updateOrderStatus } = useOrderStore();
+  const { products, fetchProducts, addProduct, toggleAvailability, deleteProduct } = useProductStore();
 
   const [activeTab, setActiveTab] = useState<'orders' | 'products' | 'users'>('orders');
   const [filterStatus, setFilterStatus] = useState<string>('ALL');
@@ -51,7 +51,9 @@ export function AdminDashboardPage() {
 
   useEffect(() => {
     setIsMounted(true);
-  }, []);
+    fetchOrders();
+    fetchProducts();
+  }, [fetchOrders, fetchProducts]);
 
   if (!isMounted) return null;
 
@@ -97,7 +99,7 @@ export function AdminDashboardPage() {
     }
   };
 
-  const handleCreateProduct = (e: React.FormEvent) => {
+  const handleCreateProduct = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newProdName || !newProdPrice) {
       alert("Vui lòng điền tên món nước và giá cơ bản!");
@@ -112,7 +114,7 @@ export function AdminDashboardPage() {
 
     const finalImage = newProdImage.trim() || '/images/tra-olong-oi-hong.png';
 
-    addProduct({
+    await addProduct({
       name: newProdName.trim(),
       basePrice: priceNum,
       image: finalImage,
@@ -126,7 +128,7 @@ export function AdminDashboardPage() {
     setNewProdPrice('');
     setNewProdImage('');
     setIsAddProductModalOpen(false);
-    alert(`Đã thêm thành công món nước: ${newProdName}! Món nước mới đã tự động hiển thị trên thực đơn của Khách.`);
+    alert(`Đã thêm thành công món nước: ${newProdName} vào PostgreSQL Database!`);
   };
 
   const handleAddAdminEmail = (e: React.FormEvent) => {
@@ -170,7 +172,7 @@ export function AdminDashboardPage() {
             </div>
             <div>
               <h1 className="font-bold text-lg leading-none">Mint Shop Admin</h1>
-              <p className="text-xs text-emerald-300 mt-1">Quản lý Đơn hàng Realtime & Thực đơn Cloudinary</p>
+              <p className="text-xs text-emerald-300 mt-1">Quản lý Đơn hàng Realtime & PostgreSQL Database</p>
             </div>
           </div>
 
@@ -472,7 +474,7 @@ export function AdminDashboardPage() {
         )}
       </main>
 
-      {/* Pop-up Modal Thêm Món Nước Mới (Tải ảnh từ máy tính qua Cloudinary Upload Preset) */}
+      {/* Pop-up Modal Thêm Món Nước Mới */}
       {isAddProductModalOpen && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl animate-in zoom-in-95 duration-200 max-h-[90vh] overflow-y-auto">
@@ -510,19 +512,17 @@ export function AdminDashboardPage() {
                 />
               </div>
 
-              {/* Tên Cloud Name Cloudinary (Nếu có) */}
               <div>
                 <label className="text-xs font-semibold text-slate-700 block mb-1">Cloud Name Cloudinary của bạn (Tùy chọn)</label>
                 <input 
                   type="text"
-                  placeholder="Vd: dxxxxxxx (Mặc định: mintshop)"
+                  placeholder="Vd: diyvzyawq"
                   value={cloudName}
                   onChange={(e) => setCloudName(e.target.value)}
                   className="w-full border border-slate-200 rounded-2xl px-4 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-[#d45836]"
                 />
               </div>
 
-              {/* Nút Upload Ảnh trực tiếp từ máy tính */}
               <div>
                 <label className="text-xs font-semibold text-slate-700 block mb-1.5">
                   Tải Ảnh Từ Máy Tính (Preset: <span className="font-mono text-emerald-700">h40n7LG4wDvQ6A22x83u4qgKquo</span>)
@@ -550,7 +550,6 @@ export function AdminDashboardPage() {
                 </div>
               </div>
 
-              {/* Ô URL Ảnh (Tự động điền khi upload xong hoặc tự dán) */}
               <div>
                 <label className="text-xs font-semibold text-slate-700 block mb-1">Đường dẫn URL Ảnh (Tự động điền)</label>
                 <div className="relative">
@@ -565,7 +564,6 @@ export function AdminDashboardPage() {
                 </div>
               </div>
 
-              {/* Preview Ảnh */}
               {newProdImage && (
                 <div className="flex items-center gap-3 bg-emerald-50 p-2.5 rounded-2xl border border-emerald-200">
                   <div className="w-12 h-12 rounded-xl bg-[#fde9d6] overflow-hidden shrink-0">
@@ -575,7 +573,6 @@ export function AdminDashboardPage() {
                 </div>
               )}
 
-              {/* Sample Images Preset */}
               <div>
                 <label className="text-xs font-semibold text-slate-700 block mb-2">Hoặc chọn nhanh ảnh mẫu có sẵn:</label>
                 <div className="grid grid-cols-4 gap-2">

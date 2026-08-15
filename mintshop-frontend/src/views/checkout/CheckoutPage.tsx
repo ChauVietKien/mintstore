@@ -21,6 +21,7 @@ export function CheckoutPage() {
   
   const [createdOrder, setCreatedOrder] = useState<Order | null>(null);
   const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
 
   useEffect(() => {
@@ -34,7 +35,7 @@ export function CheckoutPage() {
   const shippingFee = subtotal >= 150000 || subtotal === 0 ? 0 : 15000;
   const totalAmount = subtotal + shippingFee;
 
-  const handleConfirmOrder = (e: React.FormEvent) => {
+  const handleConfirmOrder = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (items.length === 0) {
@@ -47,22 +48,29 @@ export function CheckoutPage() {
       return;
     }
 
-    // Gọi OrderStore tạo đơn hàng mới (Tự động truyền đơn về Admin Dashboard)
-    const newOrder = createOrder({
-      customerName,
-      customerPhone,
-      shippingAddress,
-      note,
-      items,
-      subtotal,
-      shippingFee,
-      totalAmount,
-      paymentMethod,
-    });
+    setIsSubmitting(true);
+    try {
+      // Gọi OrderStore tạo đơn hàng mới (Tự động lưu vào PostgreSQL DB & truyền đơn về Admin)
+      const newOrder = await createOrder({
+        customerName,
+        customerPhone,
+        shippingAddress,
+        note,
+        items,
+        subtotal,
+        shippingFee,
+        totalAmount,
+        paymentMethod,
+      });
 
-    setCreatedOrder(newOrder);
-    setIsSuccessModalOpen(true);
-    clearCart(); // Làm sạch giỏ hàng sau khi đặt thành công
+      setCreatedOrder(newOrder);
+      setIsSuccessModalOpen(true);
+      clearCart(); // Làm sạch giỏ hàng sau khi đặt thành công
+    } catch (err: any) {
+      alert("Có lỗi khi tạo đơn hàng. Vui lòng thử lại!");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -253,9 +261,10 @@ export function CheckoutPage() {
             {/* Submit Button */}
             <button
               type="submit"
-              className="w-full bg-[#d45836] hover:bg-[#b04529] text-white font-bold py-4 rounded-full text-base transition-all shadow-lg shadow-[#d45836]/20 active:scale-95"
+              disabled={isSubmitting}
+              className="w-full bg-[#d45836] hover:bg-[#b04529] text-white font-bold py-4 rounded-full text-base transition-all shadow-lg shadow-[#d45836]/20 active:scale-95 disabled:opacity-50"
             >
-              XÁC NHẬN ĐẶT HÀNG ({formatCurrency(totalAmount)})
+              {isSubmitting ? 'ĐANG LƯU ĐƠN HÀNG...' : `XÁC NHẬN ĐẶT HÀNG (${formatCurrency(totalAmount)})`}
             </button>
           </form>
         )}
@@ -285,7 +294,7 @@ export function CheckoutPage() {
                 href="/admin"
                 className="w-full bg-emerald-800 text-white font-bold py-3 rounded-2xl text-xs flex items-center justify-center gap-1.5 hover:bg-emerald-900 transition-all shadow-sm"
               >
-                <ShieldCheck size={16} /> Mở Admin Đề Duyệt Đơn Này
+                <ShieldCheck size={16} /> Mở Admin Để Duyệt Đơn Này
               </Link>
               <Link
                 href="/"

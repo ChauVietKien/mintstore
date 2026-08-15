@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { CartItem } from './useCartStore';
+import { api } from '@/lib/api';
 
 export type OrderStatus = 'PENDING' | 'BREWING' | 'DELIVERING' | 'COMPLETED' | 'CANCELLED';
 
@@ -26,11 +27,12 @@ export interface Order {
   status: OrderStatus;
   paymentMethod: string;
   createdAt: string;
-  timestamp: number; // Thêm mốc thời gian để sắp xếp chuẩn xác
+  timestamp: number;
 }
 
 interface OrderStore {
   orders: Order[];
+  fetchOrders: () => Promise<void>;
   createOrder: (data: {
     customerName: string;
     customerPhone: string;
@@ -41,8 +43,8 @@ interface OrderStore {
     shippingFee: number;
     totalAmount: number;
     paymentMethod: string;
-  }) => Order;
-  updateOrderStatus: (orderId: string, status: OrderStatus) => void;
+  }) => Promise<Order>;
+  updateOrderStatus: (orderId: string, status: OrderStatus) => Promise<void>;
 }
 
 const defaultOrders: Order[] = [
@@ -65,23 +67,6 @@ const defaultOrders: Order[] = [
     createdAt: new Date(Date.now() - 20 * 60 * 1000).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
     timestamp: Date.now() - 20 * 60 * 1000,
   },
-  {
-    id: "ord_102",
-    orderNumber: "MINT-8832",
-    customerName: "Trần Thị B (Đơn 2 - Đặt 10 phút trước)",
-    customerPhone: "0987654321",
-    shippingAddress: "45 Lê Lợi, Quận 1, TP.HCM",
-    items: [
-      { name: "Trà Đá Xay Ổi Hồng Kem Phô Mai", size: "Vừa", quantity: 1, price: 75000, note: "Nhiều kem phô mai" },
-    ],
-    subtotal: 75000,
-    shippingFee: 15000,
-    totalAmount: 90000,
-    status: "PENDING",
-    paymentMethod: "MOMO",
-    createdAt: new Date(Date.now() - 10 * 60 * 1000).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
-    timestamp: Date.now() - 10 * 60 * 1000,
-  },
 ];
 
 export const useOrderStore = create<OrderStore>()(
@@ -89,7 +74,18 @@ export const useOrderStore = create<OrderStore>()(
     (set, get) => ({
       orders: defaultOrders,
 
-      createOrder: (data) => {
+      fetchOrders: async () => {
+        try {
+          const res = await api.get('/admin/orders');
+          if (res.data?.data && Array.isArray(res.data.data)) {
+            set({ orders: res.data.data });
+          }
+        } catch (error) {
+          console.warn('Chưa thể tải đơn hàng từ PostgreSQL DB Server.');
+        }
+      },
+
+      createOrder: async (data) => {
         const randomCode = Math.floor(1000 + Math.random() * 9000);
         const orderNumber = `MINT-${randomCode}`;
         const now = Date.now();
@@ -120,17 +116,45 @@ export const useOrderStore = create<OrderStore>()(
           timestamp: now,
         };
 
-        // Đơn nào đặt trước sẽ ở trên cùng -> Thêm đơn mới vào cuối danh sách (hoặc sắp xếp theo timestamp tăng dần)
+        // 1. Lưu local state để phản hồi giao diện tức thì
         set({ orders: [...get().orders, newOrder] });
+
+        // 2. Gửi Đơn Hàng Thật lên PostgreSQL Database qua REST API
+        try {
+          const apiPayload = {
+            ...data,
+            items: data.items.map((i) => ({
+              productId: i.productId,
+              name: i.name,
+              size: i.size,
+              quantity: i.quantity,
+              unitPrice: i.unitPrice,
+              note: i.note,
+            })),
+          };
+          const res = await api.post('/orders', apiPayload);
+          if (res.data?.data) {
+            get().fetchOrders();
+          }
+        } catch (error) {
+          console.warn('Lỗi lưu đơn hàng vào PostgreSQL DB API:', error);
+        }
+
         return newOrder;
       },
 
-      updateOrderStatus: (orderId, status) => {
+      updateOrderStatus: async (orderId, status) => {
         set({
           orders: get().orders.map((ord) =>
             ord.id === orderId ? { ...ord, status } : ord
           ),
         });
+
+        try {
+          await api.patch(`/admin/orders/${orderId}/status`, { status });
+        } catch (error) {
+          console.warn('Lỗi cập nhật trạng thái đơn hàng trong DB API:', error);
+        }
       },
     }),
     {

@@ -1,60 +1,76 @@
 import { Response } from 'express';
 import { AuthenticatedRequest } from '../../middlewares/authMiddleware.js';
-
-// Dữ liệu mẫu đơn hàng (Mock data nếu chưa kết nối DB)
-let mockOrders = [
-  {
-    id: "ord_101",
-    orderNumber: "MINT-8831",
-    customerName: "Nguyễn Văn A",
-    customerPhone: "0901234567",
-    shippingAddress: "123 Nguyễn Huệ, Quận 1, TP.HCM",
-    items: [
-      { name: "Trà Olong Ổi Hồng", size: "Lớn", quantity: 2, price: 75000 },
-      { name: "Wafu Pasta Heo Nướng", size: "Vừa", quantity: 1, price: 75000 },
-    ],
-    totalAmount: 225000,
-    status: "PENDING",
-    paymentMethod: "COD",
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: "ord_102",
-    orderNumber: "MINT-8832",
-    customerName: "Trần Thị B",
-    customerPhone: "0987654321",
-    shippingAddress: "45 Lê Lợi, Quận 1, TP.HCM",
-    items: [
-      { name: "Trà Đá Xay Ổi Hồng Kem Phô Mai", size: "Vừa", quantity: 1, price: 75000 },
-    ],
-    totalAmount: 75000,
-    status: "BREWING",
-    paymentMethod: "MOMO",
-    createdAt: new Date(Date.now() - 15 * 60 * 1000).toISOString(),
-  },
-];
+import prisma from '../../utils/prisma.js';
+import { OrderStatus } from '@prisma/client';
 
 export async function getAdminOrders(req: AuthenticatedRequest, res: Response) {
-  res.status(200).json({
-    status: 'success',
-    data: mockOrders,
-  });
+  try {
+    // Đơn hàng đặt trước sẽ xếp ở trên cùng (FIFO - createdAt: asc)
+    const dbOrders = await prisma.order.findMany({
+      include: {
+        items: true,
+      },
+      orderBy: {
+        createdAt: 'asc',
+      },
+    });
+
+    // Format dữ liệu gửi cho Admin UI
+    const formattedOrders = dbOrders.map((ord) => ({
+      id: ord.id,
+      orderNumber: ord.orderNumber,
+      customerName: ord.customerName,
+      customerPhone: ord.customerPhone,
+      shippingAddress: ord.shippingAddress,
+      note: ord.note,
+      items: ord.items.map((i) => ({
+        name: i.productName,
+        size: i.size,
+        quantity: i.quantity,
+        price: i.price,
+        note: i.toppings,
+      })),
+      subtotal: ord.totalAmount - 15000 > 0 ? ord.totalAmount - 15000 : ord.totalAmount,
+      shippingFee: 15000,
+      totalAmount: ord.totalAmount,
+      status: ord.status,
+      paymentMethod: ord.paymentMethod,
+      createdAt: new Date(ord.createdAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
+      timestamp: new Date(ord.createdAt).getTime(),
+    }));
+
+    res.status(200).json({
+      status: 'success',
+      data: formattedOrders,
+    });
+  } catch (error: any) {
+    console.error('Lỗi khi lấy danh sách đơn hàng từ DB:', error.message);
+    res.status(500).json({ status: 'error', message: error.message });
+  }
 }
 
 export async function updateOrderStatus(req: AuthenticatedRequest, res: Response) {
   const { id } = req.params;
   const { status } = req.body;
 
-  const orderIndex = mockOrders.findIndex((o) => o.id === id);
-  if (orderIndex === -1) {
-    return res.status(404).json({ status: 'error', message: 'Không tìm thấy đơn hàng' });
+  try {
+    const updatedOrder = await prisma.order.update({
+      where: { id },
+      data: {
+        status: status as OrderStatus,
+      },
+      include: {
+        items: true,
+      },
+    });
+
+    res.status(200).json({
+      status: 'success',
+      message: `Đã cập nhật trạng thái đơn ${updatedOrder.orderNumber} sang ${status}`,
+      data: updatedOrder,
+    });
+  } catch (error: any) {
+    console.error('Lỗi khi cập nhật trạng thái đơn hàng trong DB:', error.message);
+    res.status(500).json({ status: 'error', message: error.message });
   }
-
-  mockOrders[orderIndex].status = status;
-
-  res.status(200).json({
-    status: 'success',
-    message: `Đã cập nhật trạng thái đơn ${mockOrders[orderIndex].orderNumber} sang ${status}`,
-    data: mockOrders[orderIndex],
-  });
 }
