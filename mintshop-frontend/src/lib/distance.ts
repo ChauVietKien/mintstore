@@ -2,7 +2,7 @@
 export const MINT_SHOP_LOCATION = {
   lat: process.env.NEXT_PUBLIC_SHOP_LAT ? parseFloat(process.env.NEXT_PUBLIC_SHOP_LAT) : 16.45234,
   lng: process.env.NEXT_PUBLIC_SHOP_LNG ? parseFloat(process.env.NEXT_PUBLIC_SHOP_LNG) : 107.5296657,
-  name: 'Mint Shop (123 Nguyễn Huệ)',
+  name: 'Mint Shop (Hương Hồ)',
 };
 
 /**

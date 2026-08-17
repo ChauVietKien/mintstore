@@ -17,7 +17,11 @@ const app: Express = express();
 app.use(helmet());
 app.use(cookieParser());
 app.use(cors({
-  origin: process.env.CORS_ORIGIN || 'http://localhost:3000',
+  origin: [
+    'http://localhost:3000',
+    'https://mintstore.vercel.app',
+    process.env.CORS_ORIGIN || ''
+  ].filter(Boolean),
   credentials: true
 }));
 app.use(express.json());
