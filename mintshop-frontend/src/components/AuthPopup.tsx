@@ -4,9 +4,8 @@ import React, { useState } from 'react';
 import { GoogleOAuthProvider, GoogleLogin } from '@react-oauth/google';
 import { useAuthStore } from '@/store/useAuthStore';
 import { 
-  X, ShieldCheck, LogOut, LayoutDashboard, 
-  User, Mail, Lock, Eye, EyeOff, Sparkles,
-  ShoppingBag, Heart, Clock, Phone, CheckCircle2, AlertCircle
+  X, LogOut, LayoutDashboard, 
+  User, Mail, Lock, Eye, EyeOff, CheckCircle2, AlertCircle
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -47,7 +46,7 @@ export function AuthPopup({ isOpen, onClose }: AuthPopupProps) {
       onClose();
       router.push('/admin');
     } else if (res.success) {
-      setTimeout(() => onClose(), 1200);
+      setTimeout(() => onClose(), 1000);
     }
   };
 
@@ -66,7 +65,7 @@ export function AuthPopup({ isOpen, onClose }: AuthPopupProps) {
     }
 
     setLoading(true);
-    setMessage('Đang kiểm tra thông tin đăng nhập...');
+    setMessage('Đang kiểm tra thông tin...');
     setIsError(false);
 
     const res = await loginWithEmail(email.trim(), password);
@@ -74,15 +73,15 @@ export function AuthPopup({ isOpen, onClose }: AuthPopupProps) {
 
     if (res.success) {
       setIsError(false);
-      setMessage(`Đăng nhập thành công! ${res.role === 'ADMIN' ? 'Đang mở trang Admin...' : ''}`);
+      setMessage(`Đăng nhập thành công!`);
 
       if (res.role === 'ADMIN') {
         setTimeout(() => {
           onClose();
           router.push('/admin');
-        }, 800);
+        }, 600);
       } else {
-        setTimeout(() => onClose(), 1000);
+        setTimeout(() => onClose(), 800);
       }
     } else {
       setIsError(true);
@@ -95,18 +94,18 @@ export function AuthPopup({ isOpen, onClose }: AuthPopupProps) {
     e.preventDefault();
     if (!email || !password || !fullName) {
       setIsError(true);
-      setMessage('Vui lòng điền đầy đủ Họ tên, Email và Mật khẩu.');
+      setMessage('Vui lòng điền Họ tên, Email và Mật khẩu.');
       return;
     }
 
     if (password.length < 6) {
       setIsError(true);
-      setMessage('Mật khẩu phải có tối thiểu 6 ký tự.');
+      setMessage('Mật khẩu tối thiểu 6 ký tự.');
       return;
     }
 
     setLoading(true);
-    setMessage('Đang tạo tài khoản trong PostgreSQL Database...');
+    setMessage('Đang khởi tạo tài khoản...');
     setIsError(false);
 
     const res = await registerWithEmail(email.trim(), password, fullName.trim(), phone.trim());
@@ -114,15 +113,15 @@ export function AuthPopup({ isOpen, onClose }: AuthPopupProps) {
 
     if (res.success) {
       setIsError(false);
-      setMessage(`Đăng ký thành công! ${res.role === 'ADMIN' ? 'Đã gán quyền Admin. Đang chuyển trang...' : ''}`);
+      setMessage(`Đăng ký thành công!`);
 
       if (res.role === 'ADMIN') {
         setTimeout(() => {
           onClose();
           router.push('/admin');
-        }, 1000);
+        }, 800);
       } else {
-        setTimeout(() => onClose(), 1200);
+        setTimeout(() => onClose(), 1000);
       }
     } else {
       setIsError(true);
@@ -148,158 +147,134 @@ export function AuthPopup({ isOpen, onClose }: AuthPopupProps) {
       >
         {/* Popup Card */}
         <div 
-          className="bg-white rounded-3xl max-w-[410px] w-full shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200"
+          className="bg-white rounded-3xl max-w-[390px] w-full shadow-2xl overflow-hidden animate-modal-pop border border-[#fde8d7]"
         >
-          {/* Decorative Header */}
-          <div className="relative bg-gradient-to-br from-emerald-900 via-emerald-800 to-teal-700 px-6 pt-6 pb-8 text-white overflow-hidden">
-            {/* Floating circles decoration */}
-            <div className="absolute top-4 right-4 w-20 h-20 bg-white/10 rounded-full blur-xl"></div>
-            <div className="absolute -bottom-6 -left-6 w-24 h-24 bg-white/5 rounded-full blur-lg"></div>
-
+          {/* Header Bar */}
+          <div className="relative bg-gradient-to-br from-[#ea8025] to-[#d46f19] px-6 pt-6 pb-6 text-white overflow-hidden">
             <button 
               onClick={onClose}
-              className="absolute top-4 right-4 p-1.5 bg-white/20 hover:bg-white/30 rounded-full transition-colors z-20"
+              className="absolute top-4 right-4 p-1.5 bg-white/20 hover:bg-white/30 text-white rounded-full transition-colors z-20"
             >
               <X size={16} />
             </button>
 
             {isAuthenticated ? (
-              <div className="flex flex-col items-center text-center relative z-10">
-                <div className="w-16 h-16 rounded-full bg-white/20 border-2 border-white/40 flex items-center justify-center mb-3 overflow-hidden shadow-inner">
+              <div className="flex items-center gap-3.5 relative z-10">
+                <div className="w-14 h-14 rounded-full bg-white/20 border-2 border-white/40 flex items-center justify-center overflow-hidden shrink-0">
                   {user?.avatar ? (
                     <img src={user.avatar} alt={user.name} className="w-full h-full object-cover" />
                   ) : (
-                    <User size={32} className="text-white/90" />
+                    <User size={28} className="text-white" />
                   )}
                 </div>
-                <h2 className="text-lg font-bold">{user?.name}</h2>
-                <p className="text-emerald-200 text-xs mt-0.5">{user?.email}</p>
-                <div className="mt-2 flex items-center gap-1.5">
-                  <span className="bg-amber-400 text-emerald-950 text-[10px] font-extrabold px-3 py-0.5 rounded-full uppercase tracking-wide shadow-sm">
-                    {user?.role === 'ADMIN' ? '👑 Super Admin' : '🛒 Thành viên'}
+                <div>
+                  <h2 className="text-base font-bold tracking-tight text-white">{user?.name}</h2>
+                  <p className="text-amber-100 text-xs">{user?.email}</p>
+                  <span className="inline-block mt-1 bg-white text-[#ea8025] text-[10px] font-extrabold px-2.5 py-0.5 rounded-full uppercase tracking-wider">
+                    {user?.role === 'ADMIN' ? '👑 Super Admin' : 'Thành Viên'}
                   </span>
                 </div>
               </div>
             ) : (
               <div className="relative z-10">
-                <div className="flex items-center gap-3.5">
-                  <div className="w-11 h-11 bg-white/20 border border-white/30 rounded-2xl flex items-center justify-center text-white font-black text-xl shadow-inner">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 bg-white/20 border border-white/30 rounded-2xl flex items-center justify-center text-white font-black text-lg">
                     M
                   </div>
                   <div>
-                    <h2 className="text-xl font-bold leading-tight flex items-center gap-1.5">
-                      Mint Shop <Sparkles size={16} className="text-amber-300 fill-amber-300" />
+                    <h2 className="text-lg font-bold leading-tight text-white">
+                      Mint Shop
                     </h2>
-                    <p className="text-emerald-200 text-xs">Đặt trà sữa & nước uống ngon ngất ngây</p>
+                    <p className="text-amber-100 text-xs">Đăng nhập / Đăng ký tài khoản</p>
                   </div>
                 </div>
               </div>
             )}
           </div>
 
-          {/* Content Body */}
+          {/* Body Content */}
           <div className="px-6 py-5">
             {isAuthenticated ? (
-              /* ========== TRẠNG THÁI ĐÃ ĐĂNG NHẬP ========== */
-              <div className="space-y-3">
-                {/* Quick Stats */}
-                <div className="grid grid-cols-3 gap-2">
-                  <div className="bg-slate-50 rounded-2xl p-3 text-center border border-slate-100">
-                    <ShoppingBag size={18} className="mx-auto text-emerald-600 mb-1" />
-                    <span className="text-[11px] text-slate-500 block">Đơn hàng</span>
-                    <span className="text-sm font-bold text-slate-800">100% Ok</span>
-                  </div>
-                  <div className="bg-slate-50 rounded-2xl p-3 text-center border border-slate-100">
-                    <Heart size={18} className="mx-auto text-rose-500 mb-1" />
-                    <span className="text-[11px] text-slate-500 block">Yêu thích</span>
-                    <span className="text-sm font-bold text-slate-800">Trà Olong</span>
-                  </div>
-                  <div className="bg-slate-50 rounded-2xl p-3 text-center border border-slate-100">
-                    <Clock size={18} className="mx-auto text-amber-500 mb-1" />
-                    <span className="text-[11px] text-slate-500 block">Tích điểm</span>
-                    <span className="text-sm font-bold text-slate-800">500đ</span>
-                  </div>
-                </div>
-
-                {/* Action Buttons */}
+              /* ===== ĐÃ ĐĂNG NHẬP ===== */
+              <div className="space-y-2.5">
                 {isAdmin && (
                   <Link 
                     href="/admin"
                     onClick={onClose}
-                    className="w-full bg-emerald-800 text-white text-sm font-bold py-3.5 px-4 rounded-2xl flex items-center justify-center gap-2 hover:bg-emerald-900 transition-all shadow-md active:scale-95"
+                    className="w-full bg-[#ea8025] hover:bg-[#d46f19] text-white text-xs font-bold py-3 px-4 rounded-2xl flex items-center justify-center gap-2 transition-all shadow-md active:scale-95 uppercase tracking-wider"
                   >
-                    <LayoutDashboard size={18} /> Vào Trang Quản Trị Admin
+                    <LayoutDashboard size={16} /> Vào Trang Quản Trị Admin
                   </Link>
                 )}
 
                 <button
                   onClick={handleLogout}
-                  className="w-full bg-slate-100 text-slate-700 text-sm font-bold py-3.5 px-4 rounded-2xl flex items-center justify-center gap-2 hover:bg-slate-200 transition-colors"
+                  className="w-full bg-[#fff3e8] text-[#ea8025] text-xs font-bold py-3 px-4 rounded-2xl flex items-center justify-center gap-2 hover:bg-[#fde2cb] transition-colors border border-[#fde2cb]"
                 >
-                  <LogOut size={16} /> Đăng xuất tài khoản
+                  <LogOut size={15} /> Đăng xuất tài khoản
                 </button>
               </div>
             ) : (
-              /* ========== TRẠNG THÁI CHƯA ĐĂNG NHẬP ========== */
+              /* ===== CHƯA ĐĂNG NHẬP ===== */
               <div className="space-y-4">
-                {/* Login / Register Tabs */}
-                <div className="flex bg-slate-100 rounded-2xl p-1 border border-slate-200/60">
+                {/* Tabs */}
+                <div className="flex bg-[#fff3e8] rounded-2xl p-1 border border-[#fde2cb]">
                   <button
                     onClick={() => { setActiveTab('login'); setMessage(''); setIsError(false); }}
-                    className={`flex-1 py-2.5 rounded-xl text-xs font-extrabold uppercase tracking-wider transition-all ${
+                    className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all ${
                       activeTab === 'login'
-                        ? 'bg-white text-emerald-900 shadow-sm'
-                        : 'text-slate-500 hover:text-slate-800'
+                        ? 'bg-white text-[#ea8025] shadow-sm'
+                        : 'text-stone-500 hover:text-[#ea8025]'
                     }`}
                   >
                     Đăng nhập
                   </button>
                   <button
                     onClick={() => { setActiveTab('register'); setMessage(''); setIsError(false); }}
-                    className={`flex-1 py-2.5 rounded-xl text-xs font-extrabold uppercase tracking-wider transition-all ${
+                    className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all ${
                       activeTab === 'register'
-                        ? 'bg-white text-emerald-900 shadow-sm'
-                        : 'text-slate-500 hover:text-slate-800'
+                        ? 'bg-white text-[#ea8025] shadow-sm'
+                        : 'text-stone-500 hover:text-[#ea8025]'
                     }`}
                   >
-                    Tạo tài khoản mới
+                    Tạo tài khoản
                   </button>
                 </div>
 
                 {activeTab === 'login' ? (
-                  /* ===== TAB ĐĂNG NHẬP ===== */
+                  /* Form Đăng Nhập */
                   <form onSubmit={handleEmailLogin} className="space-y-3">
                     <div>
-                      <label className="text-xs font-semibold text-slate-700 block mb-1">Email *</label>
+                      <label className="text-xs font-bold text-[#451a03] block mb-1">Email *</label>
                       <div className="relative">
-                        <Mail className="absolute left-3.5 top-3 text-slate-400" size={16} />
+                        <Mail className="absolute left-3.5 top-3 text-amber-600/60" size={16} />
                         <input
                           type="email"
                           required
-                          placeholder="Vd: maithanhda70@gmail.com"
+                          placeholder="maithanhda70@gmail.com"
                           value={email}
                           onChange={(e) => setEmail(e.target.value)}
-                          className="w-full border border-slate-200 rounded-2xl pl-10 pr-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-700 focus:bg-white bg-slate-50 text-slate-900 placeholder:text-slate-400 transition-all"
+                          className="w-full border border-[#fde2cb] bg-[#fffaf5] rounded-2xl pl-10 pr-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#ea8025] focus:bg-white text-[#451a03] transition-all placeholder:text-amber-800/40"
                         />
                       </div>
                     </div>
 
                     <div>
-                      <label className="text-xs font-semibold text-slate-700 block mb-1">Mật khẩu *</label>
+                      <label className="text-xs font-bold text-[#451a03] block mb-1">Mật khẩu *</label>
                       <div className="relative">
-                        <Lock className="absolute left-3.5 top-3 text-slate-400" size={16} />
+                        <Lock className="absolute left-3.5 top-3 text-amber-600/60" size={16} />
                         <input
                           type={showPassword ? 'text' : 'password'}
                           required
                           placeholder="••••••••"
                           value={password}
                           onChange={(e) => setPassword(e.target.value)}
-                          className="w-full border border-slate-200 rounded-2xl pl-10 pr-11 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-700 focus:bg-white bg-slate-50 text-slate-900 placeholder:text-slate-400 transition-all"
+                          className="w-full border border-[#fde2cb] bg-[#fffaf5] rounded-2xl pl-10 pr-11 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#ea8025] focus:bg-white text-[#451a03] transition-all placeholder:text-amber-800/40"
                         />
                         <button
                           type="button"
                           onClick={() => setShowPassword(!showPassword)}
-                          className="absolute right-3.5 top-2.5 text-slate-400 hover:text-slate-700 transition-colors"
+                          className="absolute right-3.5 top-2.5 text-amber-600/60 hover:text-[#ea8025] transition-colors"
                         >
                           {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                         </button>
@@ -309,62 +284,48 @@ export function AuthPopup({ isOpen, onClose }: AuthPopupProps) {
                     <button
                       type="submit"
                       disabled={loading}
-                      className="w-full bg-emerald-800 hover:bg-emerald-900 text-white font-bold text-sm py-3.5 rounded-2xl transition-all shadow-md active:scale-[0.98] disabled:opacity-50 mt-1"
+                      className="w-full bg-[#ea8025] hover:bg-[#d46f19] text-white font-bold text-xs py-3 rounded-2xl transition-all shadow-md active:scale-[0.98] disabled:opacity-50 mt-1 uppercase tracking-wider"
                     >
                       {loading ? 'Đang xử lý...' : 'ĐĂNG NHẬP NGAY'}
                     </button>
                   </form>
                 ) : (
-                  /* ===== TAB ĐĂNG KÝ ===== */
+                  /* Form Đăng Ký */
                   <form onSubmit={handleEmailRegister} className="space-y-3">
                     <div>
-                      <label className="text-xs font-semibold text-slate-700 block mb-1">Họ và tên *</label>
+                      <label className="text-xs font-bold text-[#451a03] block mb-1">Họ và tên *</label>
                       <div className="relative">
-                        <User className="absolute left-3.5 top-3 text-slate-400" size={16} />
+                        <User className="absolute left-3.5 top-3 text-amber-600/60" size={16} />
                         <input
                           type="text"
                           required
                           placeholder="Vd: Nguyễn Văn A"
                           value={fullName}
                           onChange={(e) => setFullName(e.target.value)}
-                          className="w-full border border-slate-200 rounded-2xl pl-10 pr-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-700 focus:bg-white bg-slate-50 text-slate-900 placeholder:text-slate-400 transition-all"
+                          className="w-full border border-[#fde2cb] bg-[#fffaf5] rounded-2xl pl-10 pr-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#ea8025] focus:bg-white text-[#451a03] transition-all placeholder:text-amber-800/40"
                         />
                       </div>
                     </div>
 
                     <div>
-                      <label className="text-xs font-semibold text-slate-700 block mb-1">Email đăng ký *</label>
+                      <label className="text-xs font-bold text-[#451a03] block mb-1">Email đăng ký *</label>
                       <div className="relative">
-                        <Mail className="absolute left-3.5 top-3 text-slate-400" size={16} />
+                        <Mail className="absolute left-3.5 top-3 text-amber-600/60" size={16} />
                         <input
                           type="email"
                           required
-                          placeholder="Vd: khachhang@gmail.com"
+                          placeholder="khachhang@gmail.com"
                           value={email}
                           onChange={(e) => setEmail(e.target.value)}
-                          className="w-full border border-slate-200 rounded-2xl pl-10 pr-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-700 focus:bg-white bg-slate-50 text-slate-900 placeholder:text-slate-400 transition-all"
+                          className="w-full border border-[#fde2cb] bg-[#fffaf5] rounded-2xl pl-10 pr-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#ea8025] focus:bg-white text-[#451a03] transition-all placeholder:text-amber-800/40"
                         />
                       </div>
                     </div>
 
                     <div>
-                      <label className="text-xs font-semibold text-slate-700 block mb-1">Số điện thoại (Tùy chọn)</label>
+                      <label className="text-xs font-bold text-[#451a03] block mb-1">Tạo mật khẩu *</label>
                       <div className="relative">
-                        <Phone className="absolute left-3.5 top-3 text-slate-400" size={16} />
-                        <input
-                          type="tel"
-                          placeholder="Vd: 0901234567"
-                          value={phone}
-                          onChange={(e) => setPhone(e.target.value)}
-                          className="w-full border border-slate-200 rounded-2xl pl-10 pr-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-700 focus:bg-white bg-slate-50 text-slate-900 placeholder:text-slate-400 transition-all"
-                        />
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="text-xs font-semibold text-slate-700 block mb-1">Tạo mật khẩu *</label>
-                      <div className="relative">
-                        <Lock className="absolute left-3.5 top-3 text-slate-400" size={16} />
+                        <Lock className="absolute left-3.5 top-3 text-amber-600/60" size={16} />
                         <input
                           type={showPassword ? 'text' : 'password'}
                           required
@@ -372,12 +333,12 @@ export function AuthPopup({ isOpen, onClose }: AuthPopupProps) {
                           placeholder="Tối thiểu 6 ký tự"
                           value={password}
                           onChange={(e) => setPassword(e.target.value)}
-                          className="w-full border border-slate-200 rounded-2xl pl-10 pr-11 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-700 focus:bg-white bg-slate-50 text-slate-900 placeholder:text-slate-400 transition-all"
+                          className="w-full border border-[#fde2cb] bg-[#fffaf5] rounded-2xl pl-10 pr-11 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#ea8025] focus:bg-white text-[#451a03] transition-all placeholder:text-amber-800/40"
                         />
                         <button
                           type="button"
                           onClick={() => setShowPassword(!showPassword)}
-                          className="absolute right-3.5 top-2.5 text-slate-400 hover:text-slate-700 transition-colors"
+                          className="absolute right-3.5 top-2.5 text-amber-600/60 hover:text-[#ea8025] transition-colors"
                         >
                           {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                         </button>
@@ -387,37 +348,37 @@ export function AuthPopup({ isOpen, onClose }: AuthPopupProps) {
                     <button
                       type="submit"
                       disabled={loading}
-                      className="w-full bg-emerald-800 hover:bg-emerald-900 text-white font-bold text-sm py-3.5 rounded-2xl transition-all shadow-md active:scale-[0.98] disabled:opacity-50 mt-1"
+                      className="w-full bg-[#ea8025] hover:bg-[#d46f19] text-white font-bold text-xs py-3 rounded-2xl transition-all shadow-md active:scale-[0.98] disabled:opacity-50 mt-1 uppercase tracking-wider"
                     >
-                      {loading ? 'Đang tạo tài khoản...' : 'TẠO TÀI KHOẢN NGAY'}
+                      {loading ? 'Đang khởi tạo...' : 'TẠO TÀI KHOẢN NGAY'}
                     </button>
                   </form>
                 )}
 
-                {/* Feedback Messages */}
+                {/* Response Feedback */}
                 {message && (
-                  <div className={`p-3 rounded-2xl border text-xs font-semibold flex items-center gap-2 ${
+                  <div className={`p-2.5 rounded-2xl border text-xs font-semibold flex items-center gap-2 ${
                     isError 
                       ? 'bg-rose-50 border-rose-200 text-rose-700' 
                       : 'bg-emerald-50 border-emerald-200 text-emerald-800'
                   }`}>
-                    {isError ? <AlertCircle size={16} className="shrink-0" /> : <CheckCircle2 size={16} className="shrink-0" />}
+                    {isError ? <AlertCircle size={15} className="shrink-0" /> : <CheckCircle2 size={15} className="shrink-0" />}
                     <span>{message}</span>
                   </div>
                 )}
 
                 {/* Divider */}
-                <div className="relative pt-1">
+                <div className="relative pt-0.5">
                   <div className="absolute inset-0 flex items-center">
-                    <div className="w-full border-t border-slate-200"></div>
+                    <div className="w-full border-t border-[#fde2cb]"></div>
                   </div>
                   <div className="relative flex justify-center">
-                    <span className="bg-white px-3 text-[11px] text-slate-400 font-semibold uppercase tracking-wider">hoặc đăng nhập bằng Google</span>
+                    <span className="bg-white px-3 text-[10px] text-amber-800/60 font-bold uppercase">hoặc qua Google</span>
                   </div>
                 </div>
 
-                {/* Google Login Button */}
-                <div className="flex justify-center pt-1">
+                {/* Google Login */}
+                <div className="flex justify-center pt-0.5">
                   <GoogleLogin
                     onSuccess={handleGoogleSuccess}
                     onError={handleGoogleError}

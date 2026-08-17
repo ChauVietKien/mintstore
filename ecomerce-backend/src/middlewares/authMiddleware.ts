@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
+import { getJwtSecret } from '../utils/jwt.js';
 
 export interface AuthenticatedRequest extends Request {
   user?: {
@@ -15,8 +16,7 @@ export function authenticateToken(
   res: Response,
   next: NextFunction
 ) {
-  const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
+  const token = req.cookies?.token;
 
   if (!token) {
     return res.status(401).json({
@@ -25,9 +25,8 @@ export function authenticateToken(
     });
   }
 
-  const secret = process.env.JWT_SECRET || 'mintshop_super_secret_jwt_key_2026_secure';
-
   try {
+    const secret = getJwtSecret();
     const decoded = jwt.verify(token, secret) as any;
     req.user = decoded;
     next();

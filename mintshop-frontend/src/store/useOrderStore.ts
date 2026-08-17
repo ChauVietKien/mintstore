@@ -1,12 +1,13 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { CartItem } from './useCartStore';
-import { api } from '@/lib/api';
+import { orderService } from '@/services';
 
 export type OrderStatus = 'PENDING' | 'BREWING' | 'DELIVERING' | 'COMPLETED' | 'CANCELLED';
 
 export interface OrderItem {
   name: string;
+  productName?: string;
   size?: string;
   quantity: number;
   price: number;
@@ -19,6 +20,8 @@ export interface Order {
   customerName: string;
   customerPhone: string;
   shippingAddress: string;
+  latitude?: number;
+  longitude?: number;
   note?: string;
   items: OrderItem[];
   subtotal: number;
@@ -33,10 +36,13 @@ export interface Order {
 interface OrderStore {
   orders: Order[];
   fetchOrders: () => Promise<void>;
+  fetchMyOrders: () => Promise<void>;
   createOrder: (data: {
     customerName: string;
     customerPhone: string;
     shippingAddress: string;
+    latitude?: number;
+    longitude?: number;
     note?: string;
     items: CartItem[];
     subtotal: number;
@@ -47,41 +53,30 @@ interface OrderStore {
   updateOrderStatus: (orderId: string, status: OrderStatus) => Promise<void>;
 }
 
-const defaultOrders: Order[] = [
-  {
-    id: "ord_101",
-    orderNumber: "MINT-8831",
-    customerName: "Nguyễn Văn A (Đơn 1 - Đặt 20 phút trước)",
-    customerPhone: "0901234567",
-    shippingAddress: "123 Nguyễn Huệ, Quận 1, TP.HCM",
-    note: "Giao giờ hành chính",
-    items: [
-      { name: "Trà Olong Ổi Hồng", size: "Lớn", quantity: 2, price: 75000, note: "50% Đường, ít đá" },
-      { name: "Wafu Pasta Heo Nướng", size: "Vừa", quantity: 1, price: 75000 },
-    ],
-    subtotal: 225000,
-    shippingFee: 15000,
-    totalAmount: 240000,
-    status: "PENDING",
-    paymentMethod: "COD",
-    createdAt: new Date(Date.now() - 20 * 60 * 1000).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
-    timestamp: Date.now() - 20 * 60 * 1000,
-  },
-];
-
 export const useOrderStore = create<OrderStore>()(
   persist(
     (set, get) => ({
-      orders: defaultOrders,
+      orders: [],
 
       fetchOrders: async () => {
         try {
-          const res = await api.get('/admin/orders');
-          if (res.data?.data && Array.isArray(res.data.data)) {
-            set({ orders: res.data.data });
+          const data = await orderService.getAdminOrders();
+          if (data && Array.isArray(data)) {
+            set({ orders: data });
           }
         } catch (error) {
-          console.warn('Chưa thể tải đơn hàng từ PostgreSQL DB Server.');
+          console.warn('Chưa thể kết nối Backend API để tải đơn hàng.');
+        }
+      },
+
+      fetchMyOrders: async () => {
+        try {
+          const data = await orderService.getMyOrders();
+          if (data && Array.isArray(data)) {
+            set({ orders: data });
+          }
+        } catch (error) {
+          console.warn('Chưa thể kết nối Backend API để tải đơn hàng của user.');
         }
       },
 
@@ -116,10 +111,8 @@ export const useOrderStore = create<OrderStore>()(
           timestamp: now,
         };
 
-        // 1. Lưu local state để phản hồi giao diện tức thì
         set({ orders: [...get().orders, newOrder] });
 
-        // 2. Gửi Đơn Hàng Thật lên PostgreSQL Database qua REST API
         try {
           const apiPayload = {
             ...data,
@@ -132,12 +125,12 @@ export const useOrderStore = create<OrderStore>()(
               note: i.note,
             })),
           };
-          const res = await api.post('/orders', apiPayload);
-          if (res.data?.data) {
+          const created = await orderService.createOrder(apiPayload);
+          if (created) {
             get().fetchOrders();
           }
         } catch (error) {
-          console.warn('Lỗi lưu đơn hàng vào PostgreSQL DB API:', error);
+          console.warn('Lỗi lưu đơn hàng vào DB API:', error);
         }
 
         return newOrder;
@@ -151,7 +144,7 @@ export const useOrderStore = create<OrderStore>()(
         });
 
         try {
-          await api.patch(`/admin/orders/${orderId}/status`, { status });
+          await orderService.updateOrderStatus(orderId, status);
         } catch (error) {
           console.warn('Lỗi cập nhật trạng thái đơn hàng trong DB API:', error);
         }

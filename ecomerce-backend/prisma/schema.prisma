@@ -137,6 +137,8 @@ model Order {
   customerName  String
   customerPhone String
   shippingAddress String
+  latitude      Float?
+  longitude     Float?
   note          String?
   totalAmount   Float
   status        OrderStatus   @default(PENDING)

@@ -2,22 +2,37 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, MapPin, Phone, User, FileText, CheckCircle2, ShieldCheck, CreditCard, Banknote } from 'lucide-react';
+import dynamic from 'next/dynamic';
+import { ArrowLeft, MapPin, Phone, User, FileText, CheckCircle2, ShieldCheck, CreditCard, Banknote, Navigation, Loader2, Map, Compass } from 'lucide-react';
 import { useCartStore } from '@/store/useCartStore';
 import { useOrderStore, Order } from '@/store/useOrderStore';
+import { useAuthStore } from '@/store/useAuthStore';
 import { formatCurrency } from '@/lib/utils';
+import { calculateDistanceKm, calculateShippingFeeByDistance } from '@/lib/distance';
 import Link from 'next/link';
+
+import toast from 'react-hot-toast';
+
+const LocationModalMap = dynamic(() => import('@/components/LocationModalMap'), {
+  ssr: false,
+});
 
 export function CheckoutPage() {
   const router = useRouter();
   const { items, getTotalPrice, clearCart } = useCartStore();
   const { createOrder } = useOrderStore();
+  const { user, isAuthenticated } = useAuthStore();
 
-  const [customerName, setCustomerName] = useState('');
-  const [customerPhone, setCustomerPhone] = useState('');
-  const [shippingAddress, setShippingAddress] = useState('');
+  const [customerName, setCustomerName] = useState(user?.name || '');
+  const [customerPhone, setCustomerPhone] = useState(user?.phone || '');
+  const [shippingAddress, setShippingAddress] = useState(user?.address || '');
   const [note, setNote] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<'COD' | 'MOMO' | 'BANK'>('COD');
+  
+  const [latitude, setLatitude] = useState<number | undefined>();
+  const [longitude, setLongitude] = useState<number | undefined>();
+  const [isLocating, setIsLocating] = useState(false);
+  const [showMapModal, setShowMapModal] = useState(false);
   
   const [createdOrder, setCreatedOrder] = useState<Order | null>(null);
   const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
@@ -26,35 +41,84 @@ export function CheckoutPage() {
 
   useEffect(() => {
     setIsMounted(true);
-  }, []);
+    if (user) {
+      if (!customerName) setCustomerName(user.name || '');
+      if (!customerPhone) setCustomerPhone(user.phone || '');
+      if (!shippingAddress) setShippingAddress(user.address || '');
+    }
+  }, [user]);
+
+  const fetchCoordinates = async (addressStr: string) => {
+    if (!addressStr || addressStr.trim().length < 4) return null;
+    
+    try {
+      // Tra cứu qua OpenStreetMap Nominatim API (Miễn phí 100%)
+      const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(addressStr.trim())}&limit=1&accept-language=vi`);
+      const data = await res.json();
+      if (data && data.length > 0) {
+        const lat = parseFloat(data[0].lat);
+        const lng = parseFloat(data[0].lon);
+        setLatitude(lat);
+        setLongitude(lng);
+        return { lat, lng };
+      }
+    } catch (err) {
+      console.warn("Lỗi tra tọa độ:", err);
+    }
+    return null;
+  };
+
+  const handleAddressBlur = async () => {
+    if (!shippingAddress || shippingAddress.trim().length < 5 || (latitude && longitude)) return;
+    await fetchCoordinates(shippingAddress);
+  };
 
   if (!isMounted) return null;
 
   const subtotal = getTotalPrice();
-  // Phí ship 15.000đ, Miễn phí giao hàng cho đơn từ 150.000đ
-  const shippingFee = subtotal >= 150000 || subtotal === 0 ? 0 : 15000;
+  const distanceKm = latitude && longitude ? calculateDistanceKm(latitude, longitude) : 1.5;
+  const { shippingFee, isFreeShipping } = calculateShippingFeeByDistance(distanceKm, subtotal);
   const totalAmount = subtotal + shippingFee;
 
   const handleConfirmOrder = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (items.length === 0) {
-      alert("Giỏ hàng của bạn đang trống!");
+      toast.error("Giỏ hàng của bạn đang trống!");
       return;
     }
 
     if (!customerName || !customerPhone || !shippingAddress) {
-      alert("Vui lòng điền đầy đủ Họ tên, Số điện thoại và Địa chỉ giao hàng!");
+      toast.error("Vui lòng điền đầy đủ Họ tên, Số điện thoại và Địa chỉ giao hàng!");
+      return;
+    }
+
+    if (shippingAddress.trim().length < 12) {
+      toast.error("Vui lòng nhập địa chỉ chi tiết (bao gồm Số nhà, Tên đường, Phường/Xã, Quận/Huyện)!");
       return;
     }
 
     setIsSubmitting(true);
     try {
-      // Gọi OrderStore tạo đơn hàng mới (Tự động lưu vào PostgreSQL DB & truyền đơn về Admin)
+      let finalLat = latitude;
+      let finalLng = longitude;
+
+      // Đảm bảo bắt buộc tra tọa độ nếu chưa có trước khi lưu đơn hàng
+      if (!finalLat || !finalLng) {
+        const coords = await fetchCoordinates(shippingAddress);
+        if (coords) {
+          finalLat = coords.lat;
+          finalLng = coords.lng;
+        }
+      }
+
+      // Gọi OrderStore tạo đơn hàng mới
       const newOrder = await createOrder({
         customerName,
         customerPhone,
         shippingAddress,
+        latitude: finalLat,
+        longitude: finalLng,
         note,
         items,
         subtotal,
@@ -65,9 +129,9 @@ export function CheckoutPage() {
 
       setCreatedOrder(newOrder);
       setIsSuccessModalOpen(true);
-      clearCart(); // Làm sạch giỏ hàng sau khi đặt thành công
+      clearCart();
     } catch (err: any) {
-      alert("Có lỗi khi tạo đơn hàng. Vui lòng thử lại!");
+      toast.error("Có lỗi khi tạo đơn hàng. Vui lòng thử lại!");
     } finally {
       setIsSubmitting(false);
     }
@@ -137,19 +201,66 @@ export function CheckoutPage() {
                 </div>
 
                 <div>
-                  <label className="text-xs font-semibold text-slate-600 block mb-1">Địa chỉ nhận nước chi tiết *</label>
+                  <div className="flex justify-between items-center mb-1">
+                    <label className="text-xs font-semibold text-slate-600">Địa chỉ nhận nước chi tiết *</label>
+                    <button
+                      type="button"
+                      onClick={() => setShowMapModal(true)}
+                      className="text-[11px] font-extrabold text-[#d45836] bg-[#fdf2ee] hover:bg-[#fde2cb] border border-[#fde2cb] px-3 py-1 rounded-full transition-all flex items-center gap-1.5 shrink-0 shadow-xs active:scale-95"
+                    >
+                      <Compass size={13} className="text-[#d45836] animate-spin-slow" />
+                      <span>🗺️ Bản đồ ghim tâm (Grab)</span>
+                    </button>
+                  </div>
                   <div className="relative">
                     <MapPin className="absolute left-3.5 top-3 text-slate-400" size={16} />
                     <input 
                       type="text"
                       required
                       value={shippingAddress}
-                      onChange={(e) => setShippingAddress(e.target.value)}
-                      placeholder="Vd: Số 123 Nguyễn Huệ, P. Bến Nghé, Q.1"
-                      className="w-full bg-slate-50 border border-slate-200 rounded-2xl pl-10 pr-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#d45836] focus:bg-white transition-all"
+                      onChange={(e) => {
+                        setShippingAddress(e.target.value);
+                        setLatitude(undefined);
+                        setLongitude(undefined);
+                      }}
+                      onBlur={handleAddressBlur}
+                      placeholder="Vd: 123 Nguyễn Huệ, P. Bến Nghé, Q.1, TPHCM"
+                      className="w-full bg-slate-50 border border-slate-200 rounded-2xl pl-10 pr-4 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#d45836] focus:bg-white transition-all font-medium"
                     />
                   </div>
+
+                  {latitude && longitude ? (
+                    <div className="mt-2 bg-emerald-50 border border-emerald-200 p-2.5 rounded-2xl flex items-center justify-between text-xs">
+                      <span className="text-emerald-800 font-bold flex items-center gap-1">
+                        ✓ Đã xác định vị trí giao nước
+                      </span>
+                      <span className="bg-emerald-600 text-white font-extrabold px-2 py-0.5 rounded-full text-[10px]">
+                        ⚡ Cách quán {distanceKm} KM
+                      </span>
+                    </div>
+                  ) : (
+                    <p className="text-[10px] text-slate-500 font-medium mt-1">
+                      💡 Bấm <strong className="text-[#d45836]">"Bản đồ ghim tâm"</strong> để chọn cổng nhà hoặc nhập đầy đủ Tên đường, Phường/Quận.
+                    </p>
+                  )}
                 </div>
+
+                {/* Modal Bản Đồ Tương Tác Chuẩn Grab / Google Maps Style */}
+                <LocationModalMap
+                  isOpen={showMapModal}
+                  onClose={() => setShowMapModal(false)}
+                  initialLat={latitude}
+                  initialLng={longitude}
+                  initialAddress={shippingAddress}
+                  onConfirm={({ address, latitude: lat, longitude: lng }) => {
+                    setLatitude(lat);
+                    setLongitude(lng);
+                    if (address) {
+                      setShippingAddress(address);
+                    }
+                    toast.success('Đã cập nhật vị trí giao nước!');
+                  }}
+                />
 
                 <div>
                   <label className="text-xs font-semibold text-slate-600 block mb-1">Ghi chú cho shipper/quán (Tùy chọn)</label>
@@ -238,17 +349,20 @@ export function CheckoutPage() {
               </div>
 
               <div className="flex justify-between text-sm text-slate-600">
-                <span>Phí giao hàng (Phí ship)</span>
+                <span className="flex items-center gap-1">
+                  <span>Phí giao hàng</span>
+                  <span className="text-[11px] font-semibold text-slate-500">({distanceKm} km)</span>
+                </span>
                 {shippingFee === 0 ? (
-                  <span className="font-bold text-emerald-600">MIỄN PHÍ</span>
+                  <span className="font-bold text-emerald-600">MIỄN PHÍ SHIP</span>
                 ) : (
                   <span className="font-semibold text-slate-900">{formatCurrency(shippingFee)}</span>
                 )}
               </div>
 
               {subtotal < 150000 && (
-                <p className="text-[11px] text-amber-600 font-medium bg-amber-50 p-2 rounded-xl border border-amber-100">
-                  💡 Mẹo: Mua thêm {formatCurrency(150000 - subtotal)} để được MIỄN PHÍ GIAO HÀNG!
+                <p className="text-[11px] text-amber-700 font-medium bg-amber-50 p-2.5 rounded-2xl border border-amber-200">
+                  💡 Mẹo: Mua thêm {formatCurrency(150000 - subtotal)} để được MIỄN PHÍ GIAO HÀNG toàn quốc!
                 </p>
               )}
 
@@ -291,16 +405,10 @@ export function CheckoutPage() {
 
             <div className="space-y-2">
               <Link
-                href="/admin"
-                className="w-full bg-emerald-800 text-white font-bold py-3 rounded-2xl text-xs flex items-center justify-center gap-1.5 hover:bg-emerald-900 transition-all shadow-sm"
-              >
-                <ShieldCheck size={16} /> Mở Admin Để Duyệt Đơn Này
-              </Link>
-              <Link
                 href="/"
-                className="w-full bg-slate-100 text-slate-700 font-semibold py-3 rounded-2xl text-xs block hover:bg-slate-200 transition-all"
+                className="w-full bg-[#ea8025] text-white font-bold py-3.5 rounded-2xl text-xs block hover:bg-[#d46f19] transition-all shadow-md"
               >
-                Trở Về Trang Chủ
+                Trở Về Trang Chủ Mua Sắm
               </Link>
             </div>
           </div>

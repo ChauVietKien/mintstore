@@ -1,7 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { mockProducts } from '@/lib/mock-data';
-import { api } from '@/lib/api';
+import { productService } from '@/services';
 
 export interface ProductSizeOption {
   id?: string;
@@ -29,21 +28,16 @@ interface ProductStore {
   getAvailableProducts: () => ProductItem[];
 }
 
-const defaultProducts: ProductItem[] = mockProducts.map((p) => ({
-  ...p,
-  isAvailable: true,
-}));
-
 export const useProductStore = create<ProductStore>()(
   persist(
     (set, get) => ({
-      products: defaultProducts,
+      products: [],
 
       fetchProducts: async () => {
         try {
-          const res = await api.get('/products');
-          if (res.data?.data && Array.isArray(res.data.data) && res.data.data.length > 0) {
-            const formatted = res.data.data.map((p: any) => ({
+          const data = await productService.getProducts();
+          if (data && Array.isArray(data)) {
+            const formatted = data.map((p: any) => ({
               id: p.id,
               name: p.name,
               basePrice: p.basePrice,
@@ -57,29 +51,27 @@ export const useProductStore = create<ProductStore>()(
             set({ products: formatted });
           }
         } catch (error) {
-          console.warn('Chưa thể tải sản phẩm từ PostgreSQL DB Server, dùng danh sách khởi tạo.');
+          console.warn('Chưa thể kết nối tới Backend API.');
         }
       },
 
       addProduct: async (newProd) => {
-        const id = `prod_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+        const id = `prod_${Date.now()}`;
         const localProd: ProductItem = {
           ...newProd,
           id,
           isAvailable: true,
         };
 
-        // 1. Cập nhật state local ngay để giao diện mượt mà
         set({ products: [localProd, ...get().products] });
 
-        // 2. Lưu vĩnh viễn vào PostgreSQL Database qua REST API
         try {
-          const res = await api.post('/admin/products', newProd);
-          if (res.data?.data) {
+          const data = await productService.createProduct(newProd);
+          if (data) {
             get().fetchProducts();
           }
         } catch (error) {
-          console.warn('Lỗi lưu sản phẩm vào PostgreSQL DB API:', error);
+          console.warn('Lỗi lưu sản phẩm vào DB API:', error);
         }
       },
 
@@ -91,7 +83,7 @@ export const useProductStore = create<ProductStore>()(
         });
 
         try {
-          await api.patch(`/admin/products/${id}/toggle`);
+          await productService.toggleAvailability(id);
         } catch (error) {
           console.warn('Lỗi toggle sản phẩm trong DB API:', error);
         }
@@ -103,7 +95,7 @@ export const useProductStore = create<ProductStore>()(
         });
 
         try {
-          await api.delete(`/admin/products/${id}`);
+          await productService.deleteProduct(id);
         } catch (error) {
           console.warn('Lỗi xóa sản phẩm trong DB API:', error);
         }

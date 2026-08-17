@@ -1,7 +1,6 @@
 import React from 'react';
 import { Plus } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
-import Image from 'next/image';
 
 interface ProductCardProps {
   product: any;
@@ -10,37 +9,34 @@ interface ProductCardProps {
 
 export function ProductCard({ product, onAddClick }: ProductCardProps) {
   return (
-    <div className="flex bg-white rounded-2xl border border-slate-100 shadow-sm p-4 gap-4 items-center mb-4 hover:shadow-md transition-shadow">
-      {/* Product Image */}
-      <div className="relative w-24 h-24 shrink-0 bg-[#fde9d6] rounded-full flex items-center justify-center overflow-hidden">
-        {/* Vòng tròn nền (mô phỏng layout trên ảnh) */}
-        <div className="absolute w-20 h-20 rounded-full bg-white/20"></div>
-        {/* Placeholder for real image */}
-        <div className="z-10 w-20 h-20 bg-slate-200 rounded-full flex items-center justify-center text-xs text-slate-500 overflow-hidden">
-          {product.image ? (
-            <img src={product.image} alt={product.name} className="w-full h-full object-cover" />
-          ) : (
-            "Img"
-          )}
-        </div>
+    <div className="flex bg-white rounded-3xl border border-[#f1ece4] shadow-sm p-4 gap-4 items-center mb-3 hover:shadow-md transition-all">
+      {/* Product Image Container */}
+      <div className="relative w-24 h-24 shrink-0 bg-[#fcf8f2] border border-[#f1ece4] rounded-2xl flex items-center justify-center overflow-hidden shadow-inner">
+        {product.image ? (
+          <img src={product.image} alt={product.name} className="w-full h-full object-cover" />
+        ) : (
+          <div className="w-full h-full bg-[#fde9d6] flex items-center justify-center text-xs font-bold text-[#ea8025]">
+            Mint
+          </div>
+        )}
       </div>
 
-      {/* Product Info */}
-      <div className="flex-1 flex flex-col justify-between py-1 min-h-[96px]">
+      {/* Product Details */}
+      <div className="flex-1 flex flex-col justify-between py-0.5 min-h-[90px]">
         <div>
-          <h3 className="font-semibold text-slate-900 leading-tight line-clamp-2">
+          <h3 className="font-bold text-[#1c1917] text-base leading-snug line-clamp-2">
             {product.name}
           </h3>
-          <p className="text-slate-600 font-medium mt-2">
+          <p className="text-[#ea8025] font-extrabold text-sm mt-1">
             {formatCurrency(product.basePrice)}
           </p>
         </div>
         
-        {/* Add Button */}
+        {/* Plus Action Button */}
         <div className="flex justify-end mt-auto">
           <button
             onClick={() => onAddClick(product)}
-            className="w-8 h-8 flex items-center justify-center rounded-full bg-amber-100 text-amber-700 hover:bg-amber-200 active:scale-95 transition-all"
+            className="w-9 h-9 flex items-center justify-center rounded-2xl bg-[#ea8025] text-white hover:bg-[#d46f19] active:scale-95 transition-all shadow-sm"
           >
             <Plus size={20} strokeWidth={2.5} />
           </button>

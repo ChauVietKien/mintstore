@@ -2,6 +2,7 @@ import express, { Express, Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import dotenv from 'dotenv';
+import cookieParser from 'cookie-parser';
 
 import productRoutes from './routes/product.routes.js';
 import authRoutes from './routes/auth.routes.js';
@@ -14,8 +15,9 @@ const app: Express = express();
 
 // Middlewares
 app.use(helmet());
+app.use(cookieParser());
 app.use(cors({
-  origin: process.env.CORS_ORIGIN || '*',
+  origin: process.env.CORS_ORIGIN || 'http://localhost:3000',
   credentials: true
 }));
 app.use(express.json());

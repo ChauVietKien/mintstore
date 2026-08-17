@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { api } from '@/lib/api';
+import { authService } from '@/services';
 
 export interface UserProfile {
   id: string;
@@ -8,37 +8,36 @@ export interface UserProfile {
   name: string;
   avatar?: string;
   phone?: string;
+  address?: string;
   role: 'ADMIN' | 'CUSTOMER';
 }
 
 interface AuthStore {
   user: UserProfile | null;
-  token: string | null;
   isAuthenticated: boolean;
   isAdmin: boolean;
   loginWithGoogleToken: (idToken: string) => Promise<{ success: boolean; role: string; message: string }>;
   loginWithEmail: (email: string, password: string) => Promise<{ success: boolean; role: string; message: string }>;
   registerWithEmail: (email: string, password: string, name: string, phone?: string) => Promise<{ success: boolean; role: string; message: string }>;
+  updateProfile: (updatedData: Partial<UserProfile>) => Promise<{ success: boolean; message: string }>;
   setMockAdmin: (email?: string) => void;
-  logout: () => void;
+  logout: () => Promise<void>;
 }
 
 export const useAuthStore = create<AuthStore>()(
   persist(
     (set, get) => ({
       user: null,
-      token: null,
       isAuthenticated: false,
       isAdmin: false,
 
       loginWithGoogleToken: async (idToken: string) => {
         try {
-          const response = await api.post('/auth/google', { idToken });
-          const { user, token } = response.data.data;
+          const data = await authService.loginWithGoogle(idToken);
+          const { user } = data;
 
           set({
             user,
-            token,
             isAuthenticated: true,
             isAdmin: user.role === 'ADMIN',
           });
@@ -60,7 +59,6 @@ export const useAuthStore = create<AuthStore>()(
 
           set({
             user: mockUser,
-            token: 'mock_jwt_token_admin',
             isAuthenticated: true,
             isAdmin: true,
           });
@@ -75,12 +73,11 @@ export const useAuthStore = create<AuthStore>()(
 
       loginWithEmail: async (email: string, password: string) => {
         try {
-          const response = await api.post('/auth/login', { email, password });
-          const { user, token } = response.data.data;
+          const data = await authService.loginWithEmail(email, password);
+          const { user } = data;
 
           set({
             user,
-            token,
             isAuthenticated: true,
             isAdmin: user.role === 'ADMIN',
           });
@@ -102,12 +99,11 @@ export const useAuthStore = create<AuthStore>()(
 
       registerWithEmail: async (email: string, password: string, name: string, phone?: string) => {
         try {
-          const response = await api.post('/auth/register', { email, password, name, phone });
-          const { user, token } = response.data.data;
+          const data = await authService.registerWithEmail(email, password, name, phone);
+          const { user } = data;
 
           set({
             user,
-            token,
             isAuthenticated: true,
             isAdmin: user.role === 'ADMIN',
           });
@@ -127,6 +123,29 @@ export const useAuthStore = create<AuthStore>()(
         }
       },
 
+      updateProfile: async (updatedData: Partial<UserProfile>) => {
+        const currentUser = get().user;
+        if (currentUser) {
+          try {
+            const data = await authService.updateProfile(updatedData);
+            if (data) {
+              set({
+                user: { ...currentUser, ...data }
+              });
+              return { success: true, message: 'Cập nhật thành công!' };
+            }
+          } catch (error: any) {
+            console.warn('Lỗi cập nhật profile qua API:', error);
+          }
+          // Fallback if API fails or backend isn't ready
+          set({
+            user: { ...currentUser, ...updatedData }
+          });
+          return { success: true, message: 'Đã lưu cục bộ' };
+        }
+        return { success: false, message: 'Chưa đăng nhập' };
+      },
+
       setMockAdmin: (email = 'maithanhda70@gmail.com') => {
         set({
           user: {
@@ -135,16 +154,19 @@ export const useAuthStore = create<AuthStore>()(
             name: 'Chủ Cửa Hàng (Admin)',
             role: 'ADMIN',
           },
-          token: 'mock_jwt_token',
           isAuthenticated: true,
           isAdmin: true,
         });
       },
 
-      logout: () => {
+      logout: async () => {
+        try {
+          await authService.logout();
+        } catch (err) {
+          console.warn('Lỗi khi gọi API logout:', err);
+        }
         set({
           user: null,
-          token: null,
           isAuthenticated: false,
           isAdmin: false,
         });
